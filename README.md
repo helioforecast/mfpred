@@ -3,10 +3,10 @@
 Solar wind ICME flux rope prediction with machine learning building up on the code of Reiss et al. 2021, for real time deployment.
 
 #### Authors: 
-M.A. Reiss (1), C. Möstl (2), R.L. Bailey (3), U. Amerstorfer (2), Emma Davies (2), Eva Weiler (2)
+C. Möstl (1), M.A. Reiss (2), R.L. Bailey (3), U. Amerstorfer (1), Hannah Rüdisser (1), Emma Davies (1), Eva Weiler (1)
 
-(1) NASA CCMC, 
-(2) Austrian Space Weather Office, GeoSphere Austria
+(1) Austrian Space Weather Office, GeoSphere Austria
+(2) NASA CCMC
 (3) Conrad Observatory, GeoSphere Austria
 
 
