@@ -10,7 +10,7 @@
 # 
 # 
 # ### Update
-# last update 2024 Sep 11.
+# last update 2024 Sep 12.
 # 
 # ### Ideas
 # 
@@ -44,7 +44,7 @@
 # (3) Conrad Observatory, GeoSphere Austria
 # 
 
-# In[131]:
+# In[61]:
 
 
 ########### controls
@@ -120,7 +120,7 @@ if sys.platform =='darwin':
 
 # ## load real time data
 
-# In[120]:
+# In[62]:
 
 
 filenoaa='noaa_rtsw_last_35files_now.p'
@@ -142,7 +142,7 @@ ind2=np.where(sta.time > start)[0][0]
 sta=sta[ind2:]
 
 
-# In[121]:
+# In[63]:
 
 
 ###plot NOAA
@@ -171,7 +171,7 @@ plt.grid(True)  # Adding a grid
 plt.xlim(start, end)
 
 
-# In[122]:
+# In[64]:
 
 
 sns.set_context("talk")     
@@ -220,7 +220,7 @@ plt.xlim(start, end)
 
 # ### load ML model
 
-# In[123]:
+# In[65]:
 
 
 #what the model numbers mean
@@ -248,7 +248,7 @@ model2
 # ### Apply ML model
 # 
 
-# In[124]:
+# In[66]:
 
 
 ## how to apply, first calculate features from current data? and then put into model
@@ -261,7 +261,7 @@ print('ML model to be run on real time data')
 
 # ### Make output data files and plots
 
-# In[125]:
+# In[67]:
 
 
 print()
@@ -277,7 +277,7 @@ print()
 
 # ### General Bz overview plots
 
-# In[126]:
+# In[68]:
 
 
 ##load ICME catalog
@@ -314,13 +314,13 @@ messi=np.where(ic.sc_insitu=='Messenger')[0]
 vexi=np.where(ic.sc_insitu=='VEX')[0]
 
 
-# In[127]:
+# In[69]:
 
 
 ic.keys()
 
 
-# In[128]:
+# In[71]:
 
 
 ##plot for minimum Bz vs time
@@ -349,6 +349,53 @@ print()
 print()
 
 
+# In[ ]:
+
+
+
+
+
+# ### duration of ICMEs
+
+# In[73]:
+
+
+sns.set_context("talk")     
+sns.set_style('whitegrid')
+
+fig=plt.figure(figsize=(16,8),dpi=100)
+ax1 = plt.subplot(121) 
+
+ax1.plot(ic['icme_start_time'][wini],ic['icme_duration'][wini],'ob',markersize=3,label='ICME duration')
+ax1.plot(ic['icme_start_time'][wini],ic['mo_duration'][wini],'or',markersize=3,label='MO duration')
+plt.legend()
+ax1.set_ylabel('duration [hours]')
+
+ax2 = plt.subplot(122) 
+sns.histplot(ic.loc[wini,'icme_duration']-ic.loc[wini,'mo_duration'],label='Sheath Duration',color='steelblue',kde=True,stat='probability', element='step',binwidth = 3)
+sns.histplot(ic.loc[wini,'mo_duration'],label='MO Duration',color='coral',kde=True,stat='probability', element='step',binwidth = 3)
+plt.legend()
+ax2.set_xlabel('duration [hours]')
+
+
+print('mean ICME_duration at Wind [hours]',np.round(np.nanmean(ic['icme_duration'][wini]),2),'+/-',np.round(np.nanstd(ic['icme_duration'][wini]),2))
+
+print('mean sheath_duration at Wind [hours]',np.round(np.nanmean(ic['icme_duration'][wini]-ic['mo_duration'][wini]),2), '+/-',np.round(np.nanstd(ic['icme_duration'][wini]-ic['mo_duration'][wini]),2))
+
+print('mean MO_duration at Wind [hours]',np.round(np.nanmean(ic['mo_duration'][wini]),2),'+/-',np.round(np.nanstd(ic['mo_duration'][wini]),2))
+
+plt.tight_layout()
+
+plt.savefig('plots/icme_mo_duration.png')
+plt.savefig('plots/icme_mo_duration.pdf')
+
+
+print()
+print()
+print('saved plots/icme_mo_duration.png')
+print()
+print()
+
 
 # In[ ]:
 
@@ -356,13 +403,7 @@ print()
 
 
 
-# In[ ]:
-
-
-
-
-
-# In[130]:
+# In[60]:
 
 
 t1all = time.time()
@@ -371,6 +412,18 @@ print(' ')
 print('------------------')
 print('Runtime for full high frequency data update:', np.round((t1all-t0all)/60,2), 'minutes')
 print('------------------')
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
