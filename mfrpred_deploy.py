@@ -44,15 +44,13 @@
 # (3) Conrad Observatory, GeoSphere Austria
 # 
 
-# In[118]:
+# In[131]:
 
 
 ########### controls
 
 print()
 print('started mfrpred_deploy.py')
-
-
 
 
 ################
@@ -122,7 +120,7 @@ if sys.platform =='darwin':
 
 # ## load real time data
 
-# In[110]:
+# In[120]:
 
 
 filenoaa='noaa_rtsw_last_35files_now.p'
@@ -144,7 +142,7 @@ ind2=np.where(sta.time > start)[0][0]
 sta=sta[ind2:]
 
 
-# In[111]:
+# In[121]:
 
 
 ###plot NOAA
@@ -173,7 +171,7 @@ plt.grid(True)  # Adding a grid
 plt.xlim(start, end)
 
 
-# In[112]:
+# In[122]:
 
 
 sns.set_context("talk")     
@@ -222,7 +220,7 @@ plt.xlim(start, end)
 
 # ### load ML model
 
-# In[113]:
+# In[123]:
 
 
 #what the model numbers mean
@@ -250,7 +248,7 @@ model2
 # ### Apply ML model
 # 
 
-# In[114]:
+# In[124]:
 
 
 ## how to apply, first calculate features from current data? and then put into model
@@ -263,7 +261,7 @@ print('ML model to be run on real time data')
 
 # ### Make output data files and plots
 
-# In[ ]:
+# In[125]:
 
 
 print()
@@ -279,7 +277,7 @@ print()
 
 # ### General Bz overview plots
 
-# In[115]:
+# In[126]:
 
 
 ##load ICME catalog
@@ -316,13 +314,13 @@ messi=np.where(ic.sc_insitu=='Messenger')[0]
 vexi=np.where(ic.sc_insitu=='VEX')[0]
 
 
-# In[116]:
+# In[127]:
 
 
 ic.keys()
 
 
-# In[117]:
+# In[128]:
 
 
 ##plot for minimum Bz vs time
@@ -340,9 +338,11 @@ ax1.set_ylim(-100,30)
 plt.legend(fontsize=10,loc=2)
 plt.tight_layout()
 plt.title('Bz in ICME magnetic obstacles for Wind, STEREO-A/B  ICMECAT mo_bzmin')
+
 plt.savefig('plots/icme_bz_time.png')
 
 
+print()
 print()
 print('saved plots/icme_bz_time.png')
 print()
@@ -362,15 +362,25 @@ print()
 
 
 
-# In[ ]:
+# In[130]:
 
 
 t1all = time.time()
 
 print(' ')
-print(' ')
-print(' ')
 print('------------------')
 print('Runtime for full high frequency data update:', np.round((t1all-t0all)/60,2), 'minutes')
 print('------------------')
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
 
