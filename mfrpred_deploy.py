@@ -1,27 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ### Real time deployment of the machine learning algorithms for predicting the magnetic flux rope structure in coronal mass ejections
+# ## Real time deployment of machine learning algorithms for predicting the magnetic flux rope structure in coronal mass ejections and Bz overview plots
 # 
-# This is a code adapted for real time Bz prediction from the Reiss et al. 2021 Space Weather paper.
+# This is a code adapted for real time Bz prediction from the Reiss et al. 2021 Space Weather paper, that we call *MLBz*.
 # https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2021SW002859
 # 
 # This notebook is used for real time deployment.
 # 
+# Additionally in the beginning some general plots on Bz behavior are produced, which give a first hint on how to use the minimum Bz value predicted from *MLBz* for Dst forecasting.
 # 
 # ### Update
-# last update 2024 Sep 12.
+# last update 2024 Sep 13
+# 
+# For local development, run heliocats/data_update_web_hf.ipynb first 
 # 
 # ### Ideas
 # 
 # - deploy in real time for data files for STEREO-A and NOAA RTSW  under folder data_path:
 # "stereoa_beacon_gsm_last_35days_now.p" and "noaa_rtsw_last_35files_now.p"
 # - read in ML model trained with the notebooks mfrpred_real_bz (done), mfpred_real_btot (need to update)
-# 
 # - continous deployment, look at results during CMEs
 # - assess progression of results in real time as more of the CME is seen
 # - needs different trained model for each timestep, i.e. for different hours after sheath and MFR entry?
-# 
 # - add general Bz distribution plots here at the end
 # 
 # 
@@ -44,11 +45,10 @@
 # (3) Conrad Observatory, GeoSphere Austria
 # 
 
-# In[61]:
+# In[1]:
 
 
 ########### controls
-
 print()
 print('started mfrpred_deploy.py')
 
@@ -80,6 +80,8 @@ import seaborn as sns
 import pandas as pd
 from pandas.plotting import scatter_matrix
 from sunpy.time import parse_time
+
+from scipy.stats import linregress
 
 # Machine learning
 from sklearn.model_selection import cross_val_score
@@ -117,10 +119,427 @@ if sys.platform =='darwin':
     from config_local import data_path_ml
 
 
+# # (1) General Bz overview plots
 
-# ## load real time data
+# ### flux ropes types diagram 
+# adapted from Rüdisser et al. 2024 ApJ - uncomment!
+# <!--  ![](illustrations/fr_types/Flux_Rope_Orientations.001.jpeg) -->
 
-# In[62]:
+# #### load OMNI data and HELIO4CAST ICMECAT
+
+# In[2]:
+
+
+fileomni="omni_1963_now.p"
+[o,ho]=pickle.load(open(data_path+fileomni, "rb" ) )  
+
+[ic,header,parameters] = pickle.load(open('data/ICMECAT/HELIO4CAST_ICMECAT_v22_pandas.p', "rb" ))
+
+print()
+print('ICMECAT loaded')
+
+# Spacecraft
+isc = ic.loc[:,'sc_insitu'] 
+
+# Shock arrival or density enhancement time
+icme_start_time = ic.loc[:,'icme_start_time']
+icme_start_time_num = date2num(np.array(icme_start_time))
+
+# Start time of the magnetic obstacle (mo)
+mo_start_time = ic.loc[:,'mo_start_time']
+mo_start_time_num = date2num(np.array(mo_start_time))
+
+# End time of the magnetic obstacle (mo)
+mo_end_time = ic.loc[:,'mo_end_time']
+mo_end_time_num = date2num(np.array(mo_end_time))
+
+#get indices for each target
+wini=np.where(ic.sc_insitu=='Wind')[0]
+stai=np.where(ic.sc_insitu=='STEREO-A')[0]
+stbi=np.where(ic.sc_insitu=='STEREO-B')[0]
+pspi=np.where(ic.sc_insitu=='PSP')[0]
+soloi=np.where(ic.sc_insitu=='SolarOrbiter')[0]
+bepii=np.where(ic.sc_insitu=='BepiColombo')[0]
+ulyi=np.where(ic.sc_insitu=='Ulysses')[0]
+messi=np.where(ic.sc_insitu=='Messenger')[0]
+vexi=np.where(ic.sc_insitu=='VEX')[0]
+ic.keys()
+
+
+# ### plot for minimum Bz vs time
+
+# In[3]:
+
+
+sns.set_context("talk")     
+sns.set_style('whitegrid')
+
+fig=plt.figure(figsize=(12,6),dpi=100)
+ax1 = plt.subplot(111) 
+
+ax1.plot(ic['icme_start_time'][wini],ic['mo_bzmin'][wini],'og',markersize=3,label='Wind ICME min(Bz)')
+ax1.plot(ic['icme_start_time'][stai],ic['mo_bzmin'][stai],'or',markersize=3,label='STEREO-A ICME min(Bz)')
+ax1.plot(ic['icme_start_time'][stbi],ic['mo_bzmin'][stbi],'ob',markersize=3,label='STEREO-B ICME min(Bz)')
+ax1.set_ylim(-100,30)
+plt.legend(fontsize=10,loc=2)
+plt.tight_layout()
+plt.title('Bz in ICME magnetic obstacles for Wind, STEREO-A/B  ICMECAT mo_bzmin')
+
+plt.savefig('plots/icme_bz_time.png')
+
+
+print()
+print()
+print('saved plots/icme_bz_time.png')
+print()
+print()
+
+
+# In[4]:
+
+
+########### bz min distribution in ICMEs
+
+fig=plt.figure(figsize=(12,6),dpi=100)
+ax1 = plt.subplot(121) 
+
+
+plt.title('Bz min distribution in ICMEs at Wind')
+sns.histplot(ic['mo_bzmin'][wini],kde=True,binwidth=2, stat='percent')
+#sns.distplot(ic['mo_bzmin'][stai])
+#sns.distplot(ic['mo_bzmin'][stbi])
+
+ax2 = plt.subplot(122) 
+
+
+#determine the factor that matches the Dst Bz<0 distributions in GSM 
+
+factor=9
+
+
+#this is very handy for forecast guesses:
+#-10 nT IMF has a potential -90 nT Dst
+
+#however, above -150 the factor goes towards 10
+#-100 nT has a potential -1000 nT Dst
+
+
+#only Bz values <0 
+obzlt0=o.bzgsm[np.where(o.bzgsm<0)[0]]
+
+
+plt.title('OMNI Dst and Bz')
+sns.histplot(o.dst,label='Dst',kde=True,binwidth=10, stat='percent')
+sns.histplot(obzlt0*factor,label='Bz GSM',kde=True,binwidth=10,stat='percent')
+plt.legend()
+ax2.set_xlim(-400,50)
+ax2.set_ylim(0,0.3)
+
+
+
+plt.tight_layout()
+
+
+# In[5]:
+
+
+###########
+bzmin=ic['mo_bzmin'][wini]
+ne=len(bzmin)
+
+print('stats')
+print()
+
+print('How many ICMEs at Wind have Bz < 0 nT')
+print(len(np.where(bzmin < 0)[0]),np.round(len(np.where(bzmin < 0)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -5 nT')
+print(len(np.where(bzmin < -5)[0]),np.round(len(np.where(bzmin < -5)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -10 nT')
+print(len(np.where(bzmin < -10)[0]),np.round(len(np.where(bzmin < -10)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -15 nT')
+print(len(np.where(bzmin < -15)[0]),np.round(len(np.where(bzmin < -15)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -20 nT')
+print(len(np.where(bzmin < -20)[0]),np.round(len(np.where(bzmin < -20)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -30 nT')
+print(len(np.where(bzmin < -30)[0]),np.round(len(np.where(bzmin < -30)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -40 nT')
+print(len(np.where(bzmin < -40)[0]),np.round(len(np.where(bzmin < -40)[0])/ne*100,1), '%')
+
+print('How many ICMEs at Wind have Bz < -50 nT')
+print(len(np.where(bzmin < -50)[0]),np.round(len(np.where(bzmin < -50)[0])/ne*100,1), '%')
+
+      
+
+
+# ### Duration of ICMEs
+
+# In[6]:
+
+
+sns.set_context("talk")     
+sns.set_style('whitegrid')
+
+fig=plt.figure(figsize=(16,8),dpi=100)
+ax1 = plt.subplot(121) 
+
+ax1.plot(ic['icme_start_time'][wini],ic['icme_duration'][wini],'ob',markersize=3,label='ICME duration')
+ax1.plot(ic['icme_start_time'][wini],ic['mo_duration'][wini],'or',markersize=3,label='MO duration')
+plt.legend()
+ax1.set_ylabel('duration [hours]')
+
+ax2 = plt.subplot(122) 
+sns.histplot(ic.loc[wini,'icme_duration']-ic.loc[wini,'mo_duration'],label='Sheath Duration',color='steelblue',kde=True,stat='percent', element='step',binwidth = 5)
+sns.histplot(ic.loc[wini,'mo_duration'],label='MO Duration',color='coral',kde=True,stat='percent', element='step',binwidth = 5)
+plt.legend()
+ax2.set_xlabel('duration [hours]')
+
+
+print('mean ICME_duration at Wind [hours]',np.round(np.nanmean(ic['icme_duration'][wini]),2),'+/-',np.round(np.nanstd(ic['icme_duration'][wini]),2))
+
+print('mean sheath_duration at Wind [hours]',np.round(np.nanmean(ic['icme_duration'][wini]-ic['mo_duration'][wini]),2), '+/-',np.round(np.nanstd(ic['icme_duration'][wini]-ic['mo_duration'][wini]),2))
+
+print('mean MO_duration at Wind [hours]',np.round(np.nanmean(ic['mo_duration'][wini]),2),'+/-',np.round(np.nanstd(ic['mo_duration'][wini]),2))
+
+plt.tight_layout()
+
+plt.savefig('plots/icme_mo_duration.png')
+
+savefile='plots/icme_mo_duration.png'
+plt.savefig(savefile)
+
+#savefile='plots/icme_mo_duration.pdf'
+#plt.savefig(savefile)
+
+
+print('saved ',savefile)
+print()
+
+
+
+# ### Bz vs Dst for Wind ICMEs
+
+# In[7]:
+
+
+start=datetime.datetime(1994,1,1)
+end=datetime.datetime.utcnow() 
+
+sns.set_context("talk")     
+sns.set_style('whitegrid')
+
+fig=plt.figure(figsize=(16,8),dpi=100)
+
+plt.title('Dst and MO Bz min')
+ax1 = plt.subplot(211) 
+ax1.plot(o.time,o.dst,'-k',lw=0.5)
+ax1.set_xlim(start, end)
+ax1.set_ylabel('OMNI Dst [nT]')
+
+ax2 = plt.subplot(212) 
+ax2.plot(ic['icme_start_time'][wini],ic['mo_bzmin'][wini],'og',markersize=3,label='Wind ICME min(Bz)')
+ax2.set_xlim(start, end)
+ax2.set_ylabel('MO Bzmin Wind [nT]')
+
+
+# ### plot min Bz in ICMEs vs. Dst from OMNI
+
+# In[8]:
+
+
+#min Bz from ICMECAT
+
+bz_min=np.array(ic['mo_bzmin'][wini])
+bz_mean=np.array(ic['mo_bzmean'][wini])
+bz_std=np.array(ic['mo_bzstd'][wini])
+
+#number of events
+ne=len(bz_min)
+
+print('number of Wind events',ne)
+
+#start and end times of MO
+
+win_start=np.array(ic['mo_start_time'][wini])
+win_end=np.array(ic['mo_end_time'][wini])
+
+#dst index
+
+#o.time
+#o.dst
+
+#win_start
+
+#get minimum Dst for each Wind ICMECAT event
+#define array
+dst_min=np.zeros(ne)
+dst_std=np.zeros(ne)
+dst_max=np.zeros(ne)
+dst_mean=np.zeros(ne)
+
+
+
+print(ne)
+#dstmin
+#bzmin
+
+make_indices=0
+
+if make_indices > 0: 
+    
+    for i in np.arange(ne):
+        #get the interval of the Wind MO in the OMNI data
+        ostart=np.where(o.time > win_start[i])[0][0]
+        #-1 so the omni data end time is before the mo_end_time
+        oend=np.where(o.time > win_end[i])[0][0]-1
+        #print(o.time[oend])
+        #print(win_end[i])        
+        #print()
+        dst_min[i]=np.nanmin(o.dst[ostart:oend])
+        dst_std[i]=np.nanstd(o.dst[ostart:oend])
+        dst_max[i]=np.nanmax(o.dst[ostart:oend])
+        dst_mean[i]=np.nanmean(o.dst[ostart:oend])        
+        
+        #print(dstmin[i], dstmin_std[i])
+    
+    pickle.dump([dst_min,dst_std,dst_max,dst_mean], open('data/dstmin.p', "wb"))
+
+    
+#load pickle
+[dst_min,dst_std,dst_max,dst_mean] = pickle.load(open('data/dstmin.p', "rb"))
+
+
+fig=plt.figure(figsize=(12,6),dpi=200)
+ax1 = plt.subplot(111) 
+
+
+ax1.errorbar(bz_mean, dst_min, xerr=bz_std, color='royalblue',fmt='o', ecolor='royalblue', markersize=4,capsize=2,alpha=0.4, label='<Bz> vs. min Dst in magnetic obstacle')
+
+ax1.errorbar(bz_min, dst_mean, yerr=dst_std, color='red',fmt='o', ecolor='red', markersize=4,capsize=1,alpha=0.4, label='<Dst> vs. min Bz in magnetic obstacle')
+
+
+ax1.plot(bz_min,dst_min,'ok',markersize=3, label='min Bz vs. min Dst in magnetic obstacle',zorder=3)
+
+#ax1.plot(bzmin,dst_mean,'or',markersize=3,alpha=0.5)
+#ax1.plot(bzmin,dst_mean,'or',markersize=2,alpha=0.5)
+
+ax1.set_xlim(-70,10)
+ax1.set_ylim(-700,100)
+
+plt.title('ICME magnetic obstacles: Bz from Wind and Dst from OMNI, since 1995')
+
+ax1.set_xlabel('Bz [nT]')
+ax1.set_ylabel('Dst [nT]')
+
+
+#linear fit for bzmin and dstmin
+
+# Perform linear fit (degree = 1)
+#slope, intercept = np.polyfit(bz_min, dst_min, 1)
+
+# Perform linear regression
+res = linregress(bz_min, dst_min)
+
+
+#slope, intercept, rvalue, pvalue, stderr,intercept_stderr 
+
+
+print(res.rvalue,res.pvalue)
+print(res.stderr,res.intercept_stderr)
+print(res.slope, res.intercept)
+
+
+x_fit=np.linspace(-100,0,101)
+y_fit = res.slope * x_fit + res.intercept
+
+y_fit1 = (res.slope + res.stderr*3) * x_fit + res.intercept-res.intercept_stderr*3
+y_fit2 = (res.slope-res.stderr*3) * x_fit + res.intercept+res.intercept_stderr*3
+
+
+ax1.plot(x_fit,y_fit,color='k',label='linear fit')
+ax1.plot(x_fit,y_fit1,color='k',linestyle='--',alpha=0.0)
+ax1.plot(x_fit,y_fit2,color='k',linestyle='--',alpha=0.0)
+plt.fill_between(x_fit, y_fit1, y_fit2, color='gray', alpha=0.2, label='fit scipy.linregress error 3x')
+
+ax1.legend(fontsize=10,loc=4)
+
+
+print('Slope for linear fit to go from Bz to Dst min in a magnetic obstacle is', np.round(res.slope,2))
+
+
+print('note Bz in HEEQ in ICMECAT?')
+
+savefile='plots/bz_min_dst_min.png'
+plt.savefig(savefile)
+print('saved ',savefile)
+print()
+
+
+# In[ ]:
+
+
+## make the same for product V x Bz, or for newell coupling
+#predict Bz and V, make Newell coupling, compare to observed Newell coupling
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# # (2) ML model application
+
+# ### load real time data
+
+# In[18]:
 
 
 filenoaa='noaa_rtsw_last_35files_now.p'
@@ -132,7 +551,7 @@ file_sta_beacon_gsm='stereoa_beacon_gsm_last_35days_now.p'
 print('real time NOAA RTSW and STEREO-A data loaded')
 
 #cutout last 10 days
-start=datetime.datetime.utcnow() - datetime.timedelta(days=10)
+start=datetime.datetime.utcnow() - datetime.timedelta(days=5)
 end=datetime.datetime.utcnow() 
 
 ind=np.where(noaa.time > start)[0][0]
@@ -142,36 +561,39 @@ ind2=np.where(sta.time > start)[0][0]
 sta=sta[ind2:]
 
 
-# In[63]:
+# In[19]:
 
+
+sns.set_context("talk")     
+sns.set_style('whitegrid')
 
 ###plot NOAA
-plt.figure(1,figsize=(12, 4))
+plt.figure(1,figsize=(12, 4),dpi=100)
 plt.plot(noaa.time,noaa.bz, '-b',lw=0.5)
 plt.plot(noaa.time,noaa.bt,'-k')
 
 plt.title("NOAA RTSW")  # Adding a title
 plt.xlabel("time")  # Adding X axis label
-plt.ylabel("B [nT]")  # Adding Y axis label
+plt.ylabel("B [nT] GSM")  # Adding Y axis label
 plt.grid(True)  # Adding a grid
 
 plt.xlim(start, end)
 
 #plot STEREO-A
 
-plt.figure(2,figsize=(12, 4))
+plt.figure(2,figsize=(12, 4),dpi=100)
 plt.plot(sta.time,sta.bz, '-b',lw=0.5)
 plt.plot(sta.time,sta.bt,'-k')
 
 plt.title("STEREO-A beacon")  # Adding a title
 plt.xlabel("time")  # Adding X axis label
-plt.ylabel("B [nT]")  # Adding Y axis label
+plt.ylabel("B [nT] GSM")  # Adding Y axis label
 plt.grid(True)  # Adding a grid
 
 plt.xlim(start, end)
 
 
-# In[64]:
+# In[21]:
 
 
 sns.set_context("talk")     
@@ -182,7 +604,7 @@ fig=plt.figure(figsize=(12,6),dpi=100)
 
 
 #cutout last 10 hours, e.g. sheath is over and flux rope starts
-start=datetime.datetime.utcnow() - datetime.timedelta(hours=10)
+start=datetime.datetime.utcnow() - datetime.timedelta(hours=20)
 end=datetime.datetime.utcnow() 
 
 ind=np.where(noaa.time > start)[0][0]
@@ -218,9 +640,9 @@ plt.xlim(start, end)
 
 
 
-# ### load ML model
+# ## (2.1) Reiss+ 2021 MLBz model
 
-# In[65]:
+# In[22]:
 
 
 #what the model numbers mean
@@ -245,10 +667,10 @@ model2
 
 
 
-# ### Apply ML model
+# ### Apply MLBz model
 # 
 
-# In[66]:
+# In[23]:
 
 
 ## how to apply, first calculate features from current data? and then put into model
@@ -261,7 +683,7 @@ print('ML model to be run on real time data')
 
 # ### Make output data files and plots
 
-# In[67]:
+# In[24]:
 
 
 print()
@@ -275,78 +697,18 @@ print()
 
 
 
-# ### General Bz overview plots
-
-# In[68]:
+# In[ ]:
 
 
-##load ICME catalog
-
-[ic,header,parameters] = pickle.load(open('data/ICMECAT/HELIO4CAST_ICMECAT_v22_pandas.p', "rb" ))
-
-print()
-print('ICMECAT loaded')
-
-# Spacecraft
-isc = ic.loc[:,'sc_insitu'] 
-
-# Shock arrival or density enhancement time
-icme_start_time = ic.loc[:,'icme_start_time']
-icme_start_time_num = date2num(np.array(icme_start_time))
-
-# Start time of the magnetic obstacle (mo)
-mo_start_time = ic.loc[:,'mo_start_time']
-mo_start_time_num = date2num(np.array(mo_start_time))
-
-# End time of the magnetic obstacle (mo)
-mo_end_time = ic.loc[:,'mo_end_time']
-mo_end_time_num = date2num(np.array(mo_end_time))
-
-#get indices for each target
-wini=np.where(ic.sc_insitu=='Wind')[0]
-stai=np.where(ic.sc_insitu=='STEREO-A')[0]
-stbi=np.where(ic.sc_insitu=='STEREO-B')[0]
-pspi=np.where(ic.sc_insitu=='PSP')[0]
-soloi=np.where(ic.sc_insitu=='SolarOrbiter')[0]
-bepii=np.where(ic.sc_insitu=='BepiColombo')[0]
-ulyi=np.where(ic.sc_insitu=='Ulysses')[0]
-messi=np.where(ic.sc_insitu=='Messenger')[0]
-vexi=np.where(ic.sc_insitu=='VEX')[0]
 
 
-# In[69]:
+
+# ## 2.2 Automatic flux rope type detection
+
+# In[ ]:
 
 
-ic.keys()
 
-
-# In[71]:
-
-
-##plot for minimum Bz vs time
-
-sns.set_context("talk")     
-sns.set_style('whitegrid')
-
-fig=plt.figure(figsize=(12,6),dpi=100)
-ax1 = plt.subplot(111) 
-
-ax1.plot(ic['icme_start_time'][wini],ic['mo_bzmin'][wini],'og',markersize=3,label='Wind ICME min(Bz)')
-ax1.plot(ic['icme_start_time'][stai],ic['mo_bzmin'][stai],'or',markersize=3,label='STEREO-A ICME min(Bz)')
-ax1.plot(ic['icme_start_time'][stbi],ic['mo_bzmin'][stbi],'ob',markersize=3,label='STEREO-B ICME min(Bz)')
-ax1.set_ylim(-100,30)
-plt.legend(fontsize=10,loc=2)
-plt.tight_layout()
-plt.title('Bz in ICME magnetic obstacles for Wind, STEREO-A/B  ICMECAT mo_bzmin')
-
-plt.savefig('plots/icme_bz_time.png')
-
-
-print()
-print()
-print('saved plots/icme_bz_time.png')
-print()
-print()
 
 
 # In[ ]:
@@ -355,55 +717,7 @@ print()
 
 
 
-# ### duration of ICMEs
-
-# In[73]:
-
-
-sns.set_context("talk")     
-sns.set_style('whitegrid')
-
-fig=plt.figure(figsize=(16,8),dpi=100)
-ax1 = plt.subplot(121) 
-
-ax1.plot(ic['icme_start_time'][wini],ic['icme_duration'][wini],'ob',markersize=3,label='ICME duration')
-ax1.plot(ic['icme_start_time'][wini],ic['mo_duration'][wini],'or',markersize=3,label='MO duration')
-plt.legend()
-ax1.set_ylabel('duration [hours]')
-
-ax2 = plt.subplot(122) 
-sns.histplot(ic.loc[wini,'icme_duration']-ic.loc[wini,'mo_duration'],label='Sheath Duration',color='steelblue',kde=True,stat='probability', element='step',binwidth = 3)
-sns.histplot(ic.loc[wini,'mo_duration'],label='MO Duration',color='coral',kde=True,stat='probability', element='step',binwidth = 3)
-plt.legend()
-ax2.set_xlabel('duration [hours]')
-
-
-print('mean ICME_duration at Wind [hours]',np.round(np.nanmean(ic['icme_duration'][wini]),2),'+/-',np.round(np.nanstd(ic['icme_duration'][wini]),2))
-
-print('mean sheath_duration at Wind [hours]',np.round(np.nanmean(ic['icme_duration'][wini]-ic['mo_duration'][wini]),2), '+/-',np.round(np.nanstd(ic['icme_duration'][wini]-ic['mo_duration'][wini]),2))
-
-print('mean MO_duration at Wind [hours]',np.round(np.nanmean(ic['mo_duration'][wini]),2),'+/-',np.round(np.nanstd(ic['mo_duration'][wini]),2))
-
-plt.tight_layout()
-
-plt.savefig('plots/icme_mo_duration.png')
-plt.savefig('plots/icme_mo_duration.pdf')
-
-
-print()
-print()
-print('saved plots/icme_mo_duration.png')
-print()
-print()
-
-
-# In[ ]:
-
-
-
-
-
-# In[60]:
+# In[25]:
 
 
 t1all = time.time()
@@ -412,6 +726,90 @@ print(' ')
 print('------------------')
 print('Runtime for full high frequency data update:', np.round((t1all-t0all)/60,2), 'minutes')
 print('------------------')
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
