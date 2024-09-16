@@ -45,7 +45,7 @@
 # (3) Conrad Observatory, GeoSphere Austria
 # 
 
-# In[25]:
+# In[27]:
 
 
 ########### controls
@@ -127,7 +127,7 @@ if sys.platform =='darwin':
 
 # #### load OMNI data and HELIO4CAST ICMECAT
 
-# In[2]:
+# In[28]:
 
 
 fileomni="omni_1963_now.p"
@@ -168,7 +168,7 @@ ic.keys()
 
 # ### plot for minimum Bz vs time
 
-# In[3]:
+# In[29]:
 
 
 sns.set_context("talk")     
@@ -195,7 +195,7 @@ print()
 print()
 
 
-# In[4]:
+# In[30]:
 
 
 ########### bz min distribution in ICMEs
@@ -240,7 +240,7 @@ ax2.set_ylim(0,0.3)
 plt.tight_layout()
 
 
-# In[5]:
+# In[31]:
 
 
 ###########
@@ -279,7 +279,7 @@ print(len(np.where(bzmin < -50)[0]),np.round(len(np.where(bzmin < -50)[0])/ne*10
 
 # ### Duration of ICMEs
 
-# In[6]:
+# In[32]:
 
 
 sns.set_context("talk")     
@@ -324,7 +324,7 @@ print()
 
 # ### Bz vs Dst for Wind ICMEs
 
-# In[7]:
+# In[33]:
 
 
 start=datetime.datetime(1994,1,1)
@@ -349,7 +349,7 @@ ax2.set_ylabel('MO Bzmin Wind [nT]')
 
 # ### plot min Bz in ICMEs vs. Dst from OMNI
 
-# In[8]:
+# In[34]:
 
 
 #min Bz from ICMECAT
@@ -414,7 +414,7 @@ if make_indices > 0:
 [dst_min,dst_std,dst_max,dst_mean] = pickle.load(open('data/dstmin.p', "rb"))
 
 
-# In[22]:
+# In[35]:
 
 
 fig=plt.figure(figsize=(12,6),dpi=150)
@@ -517,7 +517,7 @@ print()
 
 
 
-# In[23]:
+# In[36]:
 
 
 # make the same for product V x Bz, or for newell coupling
@@ -532,7 +532,7 @@ print()
 
 # ### plot min Bz in ICMEs vs. sheath speed
 
-# In[26]:
+# In[37]:
 
 
 # für forecast ein plot für uns
