@@ -45,7 +45,7 @@
 # (3) Conrad Observatory, GeoSphere Austria
 # 
 
-# In[15]:
+# In[25]:
 
 
 ########### controls
@@ -414,7 +414,7 @@ if make_indices > 0:
 [dst_min,dst_std,dst_max,dst_mean] = pickle.load(open('data/dstmin.p', "rb"))
 
 
-# In[16]:
+# In[22]:
 
 
 fig=plt.figure(figsize=(12,6),dpi=150)
@@ -432,7 +432,7 @@ ax1.plot(bz_min,dst_min,'ok',markersize=3, label='min Bz vs. min Dst in magnetic
 ax1.set_xlim(-80,10)
 ax1.set_ylim(-800,100)
 
-plt.title('ICME magnetic obstacles: Bz from Wind and Dst from OMNI')
+plt.title('ICME magnetic obstacles: Bz from Wind and Dst from OMNI',fontsize=15)
 
 ax1.set_xlabel('Bz [nT]')
 ax1.set_ylabel('Dst [nT]')
@@ -517,7 +517,7 @@ print()
 
 
 
-# In[17]:
+# In[23]:
 
 
 # make the same for product V x Bz, or for newell coupling
@@ -532,7 +532,7 @@ print()
 
 # ### plot min Bz in ICMEs vs. sheath speed
 
-# In[20]:
+# In[26]:
 
 
 # für forecast ein plot für uns
@@ -579,7 +579,7 @@ ax1.set_xlim(0,2000)
 ax1.set_ylim(-110,20)
 
 
-plt.title('ICME min Bz in MO versus mean sheath speed (Wind, STEREO-A/B)',fontsize=18)
+plt.title('ICME min Bz in MO and mean sheath speed (Wind, STEREO-A/B)',fontsize=15)
 
 fsize=12
 
