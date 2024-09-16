@@ -11,9 +11,9 @@
 # Additionally in the beginning some general plots on Bz behavior are produced, which give a first hint on how to use the minimum Bz value predicted from *MLBz* for Dst forecasting.
 # 
 # ### Update
-# last update 2024 Sep 13
+# last update 2024 September
 # 
-# For local development, run heliocats/data_update_web_hf.ipynb first 
+# For local development from section 2 onwards, run heliocats/data_update_web_hf.ipynb first to get the real time data
 # 
 # ### Ideas
 # 
@@ -414,22 +414,23 @@ if make_indices > 0:
 [dst_min,dst_std,dst_max,dst_mean] = pickle.load(open('data/dstmin.p', "rb"))
 
 
+# In[12]:
+
+
 fig=plt.figure(figsize=(12,6),dpi=200)
 ax1 = plt.subplot(111) 
 
-
 ax1.errorbar(bz_mean, dst_min, xerr=bz_std, color='royalblue',fmt='o', ecolor='royalblue', markersize=4,capsize=2,alpha=0.4, label='<Bz> vs. min Dst in magnetic obstacle')
-
 ax1.errorbar(bz_min, dst_mean, yerr=dst_std, color='red',fmt='o', ecolor='red', markersize=4,capsize=1,alpha=0.4, label='<Dst> vs. min Bz in magnetic obstacle')
-
-
 ax1.plot(bz_min,dst_min,'ok',markersize=3, label='min Bz vs. min Dst in magnetic obstacle',zorder=3)
+
+#sns.kdeplot(x=bz_min, y=dst_min, cmap="Reds", fill=True)
 
 #ax1.plot(bzmin,dst_mean,'or',markersize=3,alpha=0.5)
 #ax1.plot(bzmin,dst_mean,'or',markersize=2,alpha=0.5)
 
-ax1.set_xlim(-70,10)
-ax1.set_ylim(-700,100)
+ax1.set_xlim(-80,10)
+ax1.set_ylim(-800,100)
 
 plt.title('ICME magnetic obstacles: Bz from Wind and Dst from OMNI, since 1995')
 
@@ -437,44 +438,167 @@ ax1.set_xlabel('Bz [nT]')
 ax1.set_ylabel('Dst [nT]')
 
 
-#linear fit for bzmin and dstmin
 
-# Perform linear fit (degree = 1)
-#slope, intercept = np.polyfit(bz_min, dst_min, 1)
+############# Perform the polynomial fit
+from scipy.optimize import curve_fit
 
-# Perform linear regression
+
+
+x_fit=np.linspace(-100,0,101)
+
+# Define the polynomial function
+def poly_func(x, a, b, c):
+    return a * x**2 + b * x + c
+
+res2, _ = curve_fit(poly_func, bz_min, dst_min)
+
+y_fit_poly2 = poly_func(x_fit, *res2)
+
+print(f"Fitted parameters: {res2}")
+
+
+########################## Perform linear regression
 res = linregress(bz_min, dst_min)
 
-
 #slope, intercept, rvalue, pvalue, stderr,intercept_stderr 
-
-
 print(res.rvalue,res.pvalue)
 print(res.stderr,res.intercept_stderr)
 print(res.slope, res.intercept)
 
-
-x_fit=np.linspace(-100,0,101)
 y_fit = res.slope * x_fit + res.intercept
 
 y_fit1 = (res.slope + res.stderr*3) * x_fit + res.intercept-res.intercept_stderr*3
 y_fit2 = (res.slope-res.stderr*3) * x_fit + res.intercept+res.intercept_stderr*3
 
 
-ax1.plot(x_fit,y_fit,color='k',label='linear fit')
-ax1.plot(x_fit,y_fit1,color='k',linestyle='--',alpha=0.0)
-ax1.plot(x_fit,y_fit2,color='k',linestyle='--',alpha=0.0)
-plt.fill_between(x_fit, y_fit1, y_fit2, color='gray', alpha=0.2, label='fit scipy.linregress error 3x')
+ax1.plot(x_fit,y_fit,color='darkgreen',label='linear fit')
+ax1.plot(x_fit,y_fit1,color='darkgreen',linestyle='--',alpha=0.0)
+ax1.plot(x_fit,y_fit2,color='darkgreen',linestyle='--',alpha=0.0)
+plt.fill_between(x_fit, y_fit1, y_fit2, color='darkgreen', alpha=0.1, label='fit scipy.linregress error 3x')
 
+
+
+ax1.plot(x_fit,y_fit_poly2,color='tomato',label='2nd order poly fit')
+
+
+
+formulastring='$Dst_{min} [nT]='+str(np.round(res.slope,2))+'  Bz_{min} [nT]'+str(np.round(res.intercept,2))+'}$'
+ax1.annotate(formulastring,xy=(0.403,0.15),xycoords='axes fraction',fontsize=12,ha='center',bbox=dict(boxstyle='round', facecolor='white'))
 ax1.legend(fontsize=10,loc=4)
 
 
+ax1.axhline(y=-50, color='yellowgreen', linestyle='--',label='moderate',lw=1.5)
+ax1.axhline(y=-100, color='orange', linestyle='--',label='intense',lw=1.5)
+ax1.axhline(y=-150, color='red', linestyle='--',label='',lw=1.5)
+#ax1.axhline(y=-200, color='d', linestyle='--',label='')
+
+
+logo = plt.imread('logo/GSA_Basislogo_Positiv_RGB_XXS.png')
+newax = fig.add_axes([0.89,0.89,0.08,0.08], anchor='NE', zorder=1)
+newax.imshow(logo)
+newax.axis('off')
+
+
+plt.tight_layout()
+
 print('Slope for linear fit to go from Bz to Dst min in a magnetic obstacle is', np.round(res.slope,2))
-
-
 print('note Bz in HEEQ in ICMECAT?')
 
+fsize=15
+plt.figtext(0.04,0.01,'Austrian Space Weather Office   GeoSphere Austria', color='black', ha='left',fontsize=fsize-4, style='italic')
+plt.figtext(0.98,0.01,'helioforecast.space', color='black', ha='right',fontsize=fsize-4, style='italic')
+
+
 savefile='plots/bz_min_dst_min.png'
+plt.savefig(savefile)
+print('saved ',savefile)
+print()
+
+
+
+
+# In[13]:
+
+
+# make the same for product V x Bz, or for newell coupling
+# predict Bz and V, make Newell coupling, compare to observed Newell coupling
+
+
+# In[ ]:
+
+
+
+
+
+# ### plot min Bz in ICMEs vs. sheath speed
+
+# In[14]:
+
+
+# für forecast ein plot für uns
+# b in situ vs v in situ, aus eleco v -> max b und max bz vorhersagen, sozusagen den bottom floor
+
+#bz_mean=np.array(ic['mo_bzmean'][wini])
+#bz_std=np.array(ic['mo_bzstd'][wini])
+#b_max=np.array(ic['mo_bmax'][wini])
+
+
+bz_minw=np.array(ic['mo_bzmin'][wini])
+bz_mina=np.array(ic['mo_bzmin'][stai])
+bz_minb=np.array(ic['mo_bzmin'][stbi])
+
+vs_meanw=np.array(ic['sheath_speed_mean'][wini])
+vs_meana=np.array(ic['sheath_speed_mean'][stai])
+vs_meanb=np.array(ic['sheath_speed_mean'][stbi])
+
+
+#combine to single
+bz=np.hstack([bz_minw,bz_mina,bz_minb])
+vs=np.hstack([vs_meanw,vs_meana,vs_meanb])
+
+
+fig=plt.figure(figsize=(12,6),dpi=200)
+ax1 = plt.subplot(111) 
+
+#ax1.errorbar(bz_mean, dst_min, xerr=bz_std, color='royalblue',fmt='o', ecolor='royalblue', markersize=4,capsize=2,alpha=0.4, label='<Bz> vs. min Dst in magnetic obstacle')
+#ax1.errorbar(bz_min, dst_mean, yerr=dst_std, color='red',fmt='o', ecolor='red', markersize=4,capsize=1,alpha=0.4, label='<Dst> vs. min Bz in magnetic obstacle')
+
+print(len(vs))
+
+ax1.plot(vs,bz,'ok',markersize=2, label='mean V sheath vs. min Bz in magnetic obstacle',zorder=3)
+
+#ax1.plot(vs_meanw,bz_minw,'or',markersize=2, label='mean V sheath vs. min Bz in magnetic obstacle',zorder=3)
+#ax1.plot(vs_mean,b_max,'ok',markersize=3, label='mean V sheath vs. min Bz in magnetic obstacle',zorder=3)
+
+sns.kdeplot(x=vs, y=bz, cmap="Reds", fill=True)
+
+#ax1.plot(bzmin,dst_mean,'or',markersize=3,alpha=0.5)
+#ax1.plot(bzmin,dst_mean,'or',markersize=2,alpha=0.5)
+
+ax1.set_xlim(0,2000)
+ax1.set_ylim(-110,20)
+
+
+plt.title('ICME min Bz in MO versus mean sheath speed (Wind, STEREO-A/B)')
+
+fsize=12
+
+
+logo = plt.imread('logo/GSA_Basislogo_Positiv_RGB_XXS.png')
+newax = fig.add_axes([0.87,0.89,0.08,0.08], anchor='NE', zorder=1)
+newax.imshow(logo)
+newax.axis('off')
+
+     
+plt.figtext(0.04,0.01,'Austrian Space Weather Office   GeoSphere Austria', color='black', ha='left',fontsize=fsize-4, style='italic')
+plt.figtext(0.98,0.01,'helioforecast.space', color='black', ha='right',fontsize=fsize-4, style='italic')
+
+ax1.set_xlabel('<V> [km s$^{-1}$] in sheath')
+ax1.set_ylabel('Bz [nT] in magnetic obstacle')
+
+plt.tight_layout()
+
+savefile='plots/vs_mean_bz_min.png'
 plt.savefig(savefile)
 print('saved ',savefile)
 print()
@@ -483,13 +607,6 @@ print()
 # In[ ]:
 
 
-## make the same for product V x Bz, or for newell coupling
-#predict Bz and V, make Newell coupling, compare to observed Newell coupling
-
-
-# In[ ]:
-
-
 
 
 
@@ -505,16 +622,13 @@ print()
 
 
 
-# In[ ]:
+# # (2) Construct a minimal Bz model
+# 
+
+# In[185]:
 
 
-
-
-
-# In[ ]:
-
-
-
+#only based on ICME statistics above
 
 
 # In[ ]:
@@ -529,17 +643,12 @@ print()
 
 
 
-# In[ ]:
-
-
-
-
-
-# # (2) ML model application
+# # (3) ML model application
+# from Reiss et al. 2021 Space Weather
 
 # ### load real time data
 
-# In[18]:
+# In[186]:
 
 
 filenoaa='noaa_rtsw_last_35files_now.p'
@@ -561,7 +670,7 @@ ind2=np.where(sta.time > start)[0][0]
 sta=sta[ind2:]
 
 
-# In[19]:
+# In[11]:
 
 
 sns.set_context("talk")     
@@ -593,7 +702,7 @@ plt.grid(True)  # Adding a grid
 plt.xlim(start, end)
 
 
-# In[21]:
+# In[12]:
 
 
 sns.set_context("talk")     
@@ -640,9 +749,9 @@ plt.xlim(start, end)
 
 
 
-# ## (2.1) Reiss+ 2021 MLBz model
+# ## (3.1) Reiss+ 2021 MLBz model
 
-# In[22]:
+# In[13]:
 
 
 #what the model numbers mean
@@ -670,7 +779,7 @@ model2
 # ### Apply MLBz model
 # 
 
-# In[23]:
+# In[14]:
 
 
 ## how to apply, first calculate features from current data? and then put into model
@@ -683,7 +792,7 @@ print('ML model to be run on real time data')
 
 # ### Make output data files and plots
 
-# In[24]:
+# In[15]:
 
 
 print()
@@ -703,7 +812,7 @@ print()
 
 
 
-# ## 2.2 Automatic flux rope type detection
+# ## 3.2 Automatic flux rope type detection
 
 # In[ ]:
 
@@ -717,7 +826,7 @@ print()
 
 
 
-# In[25]:
+# In[16]:
 
 
 t1all = time.time()
